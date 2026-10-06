@@ -1,7 +1,7 @@
 import streamlit as st
 import json
 import os
-from datetime import date, timedelta
+from datetime import date, timedelta, time
 
 st.set_page_config(
     page_title="Smart Study Planner",
@@ -12,13 +12,11 @@ st.set_page_config(
 FILE_NAME = "study_plan.json"
 
 
-# Save plan
 def save_plan(plan):
     with open(FILE_NAME, "w") as file:
         json.dump(plan, file, indent=4)
 
 
-# Load saved plan
 def load_plan():
     if os.path.exists(FILE_NAME):
         with open(FILE_NAME, "r") as file:
@@ -27,31 +25,17 @@ def load_plan():
 
 
 st.title("📚 Smart Study Planner")
-st.write("Plan your studies and save your progress.")
+st.write("Create a personalized study schedule with study timings.")
 
 st.divider()
 
-# Load existing plan
 saved_plan = load_plan()
 
-if saved_plan:
-    st.success("💾 A saved study plan was found!")
+# -----------------------------
+# Student Details
+# -----------------------------
 
-    st.subheader("📋 Saved Plan")
-
-    st.write(f"**Student:** {saved_plan['name']}")
-    st.write(f"**Exam Date:** {saved_plan['exam_date']}")
-    st.write(f"**Daily Study Hours:** {saved_plan['hours']} hours")
-
-    st.write("### 📚 Subjects")
-
-    for subject in saved_plan["subjects"]:
-        st.write(f"• {subject}")
-
-    st.divider()
-
-# Create new plan
-st.subheader("👨‍🎓 Create / Update Your Plan")
+st.subheader("👨‍🎓 Student Details")
 
 name = st.text_input(
     "Your name",
@@ -59,11 +43,25 @@ name = st.text_input(
 )
 
 hours = st.number_input(
-    "Study hours per day",
+    "Total study hours per day",
     min_value=1,
     max_value=12,
-    value=3
+    value=4
 )
+
+exam_date = st.date_input(
+    "Exam date",
+    min_value=date.today(),
+    value=date.today() + timedelta(days=30)
+)
+
+st.divider()
+
+# -----------------------------
+# Subjects
+# -----------------------------
+
+st.subheader("📚 Subjects")
 
 subject_count = st.number_input(
     "Number of subjects",
@@ -75,21 +73,49 @@ subject_count = st.number_input(
 subjects = []
 
 for i in range(subject_count):
-    subject = st.text_input(
-        f"Subject {i + 1}",
+
+    st.markdown(f"### Subject {i + 1}")
+
+    subject_name = st.text_input(
+        "Subject name",
+        key=f"subject_{i}",
         placeholder="Example: Mathematics"
     )
 
-    if subject:
-        subjects.append(subject)
+    col1, col2 = st.columns(2)
 
-exam_date = st.date_input(
-    "Exam date",
-    min_value=date.today(),
-    value=date.today() + timedelta(days=30)
-)
+    with col1:
+        session = st.selectbox(
+            "Study session",
+            [
+                "🌅 Morning",
+                "☀️ Afternoon",
+                "🌆 Evening",
+                "🌙 Night"
+            ],
+            key=f"session_{i}"
+        )
 
-st.divider()
+    with col2:
+        study_time = st.time_input(
+            "Study time",
+            value=time(7, 0),
+            key=f"time_{i}"
+        )
+
+    if subject_name:
+        subjects.append({
+            "name": subject_name,
+            "session": session,
+            "time": study_time.strftime("%I:%M %p")
+        })
+
+    st.divider()
+
+
+# -----------------------------
+# Save Plan
+# -----------------------------
 
 if st.button("💾 Save Study Plan", use_container_width=True):
 
@@ -104,44 +130,87 @@ if st.button("💾 Save Study Plan", use_container_width=True):
         plan = {
             "name": name,
             "hours": hours,
-            "subjects": subjects,
-            "exam_date": str(exam_date)
+            "exam_date": str(exam_date),
+            "subjects": subjects
         }
 
         save_plan(plan)
 
-        st.success("✅ Your study plan has been saved permanently!")
+        st.success("✅ Study plan saved successfully!")
 
-st.divider()
 
-# Study schedule
+# -----------------------------
+# Display Saved Plan
+# -----------------------------
+
+saved_plan = load_plan()
+
 if saved_plan:
 
-    st.subheader("📅 Your Study Schedule")
+    st.divider()
 
-    exam = date.fromisoformat(saved_plan["exam_date"])
+    st.subheader("📋 Your Saved Study Plan")
+
+    st.write(f"**Student:** {saved_plan['name']}")
+    st.write(f"**Exam Date:** {saved_plan['exam_date']}")
+    st.write(
+        f"**Daily Study Hours:** {saved_plan['hours']} hours"
+    )
+
+    st.subheader("🕐 Study Timings")
+
+    for subject in saved_plan["subjects"]:
+
+        st.markdown(
+            f"### 📖 {subject['name']}"
+        )
+
+        st.write(
+            f"**{subject['session']}** — "
+            f"**{subject['time']}**"
+        )
+
+    st.divider()
+
+    # -----------------------------
+    # Exam Countdown
+    # -----------------------------
+
+    exam = date.fromisoformat(
+        saved_plan["exam_date"]
+    )
+
     days_left = (exam - date.today()).days
 
     if days_left < 0:
         days_left = 0
 
-    st.info(f"⏳ {days_left} days remaining until your exam.")
+    st.subheader("⏳ Exam Countdown")
+
+    st.info(
+        f"**{days_left} days remaining** until your exam."
+    )
+
+    # -----------------------------
+    # Weekly Schedule
+    # -----------------------------
+
+    st.subheader("📅 Study Schedule")
 
     for day in range(min(days_left, 7)):
 
         study_day = date.today() + timedelta(days=day)
 
         st.markdown(
-            f"### Day {day + 1} — {study_day.strftime('%d %B')}"
+            f"### Day {day + 1} — "
+            f"{study_day.strftime('%d %B %Y')}"
         )
 
         for subject in saved_plan["subjects"]:
 
-            study_time = saved_plan["hours"] / len(
-                saved_plan["subjects"]
-            )
-
             st.checkbox(
-                f"Study {subject} — {study_time:.1f} hours",
-                key=f"{day}_{subject}"
+                f"{subject['time']} — "
+                f"{subject['name']} "
+                f"({subject['session']})",
+                key=f"task_{day}_{subject['name']}"
             )
